@@ -1,0 +1,94 @@
+node {
+ try {
+ 
+ emailext body: 'Devops301assignment', subject: 'Pipeline Job started', to: 'yathishkumar1269@gmail.com'
+ 
+ stage('Git CheckOut') {
+    git branch: 'main', url: 'https://github.com/yathish1269/devops301assignment.git'
+ }
+ 
+ def project_path="Jenkins/petclinic-code"
+ 
+ dir(project_path) {
+ 
+ stage('Maven Clean') {
+    sh 'mvn clean'
+ }
+ 
+  stage('Maven Compile') {
+    sh 'mvn compile'
+ }
+ 
+ stage('Maven Testing') {
+    sh 'mvn test'
+ }
+ 
+ stage('Maven Package') {
+    sh 'mvn package'
+ }
+ 
+ stage('Archive Artifacts') {
+    archive 'target/*.war'
+ }
+
+ stage('Archive into Artifactory') {
+rtUpload (
+    serverId: '1',
+    spec: '''{
+          "files": [
+            {
+              "pattern": "**/*.war",
+			  "target": "generic-snapshot/"
+              
+            }
+         ]
+    }''',
+ 
+    // Optional - Associate the uploaded files with the following custom build name and build number,
+    // as build artifacts.
+    // If not set, the files will be associated with the default build name and build number (i.e the
+    // the Jenkins job name and number).
+    buildName: 'petclinic',
+    buildNumber: '1'
+)
+rtPublishBuildInfo (
+    serverId: '1',
+    // The buildName and buildNumber below are optional. If you do not set them, the Jenkins job name is used
+    // as the build name. The same goes for the build number.
+    // If you choose to set custom build name and build number by adding the following buildName and
+    // buildNumber properties, you should make sure that previous build steps (for example rtDownload
+    // and rtIpload) have the same buildName and buildNumber set. If they don't, then these steps will not
+    // be included in the build-info.
+     buildName: 'petclinic',
+    buildNumber: '1'
+)
+}
+
+ stage('SonarQube Code Analysis')
+    {
+        withSonarQubeEnv('SonarQube') {
+                sh 'mvn clean package sonar:sonar'
+        }
+    }
+
+
+ stage('Getting Ready For Ansible') {
+    sh 'cp -rf target/*.war ../../Ansible/Tomcat/files/'
+    sh "echo '<h1> Task Build ID: ${env.BUILD_DISPLAY_NAME}</h1>' > ../../Ansible/Tomcat/files/jenkins.html"
+ }
+  
+ }
+
+ def project_ansible="Ansible/Tomcat/"
+ dir(project_ansible){
+  
+ stage('Ansible Deployment') {
+    sh 'ansible-playbook webserver.yaml'
+ }
+ }
+ 
+ } catch (err) {
+     emailext body: "<b>Devops Assignment</b><br>\n <br>Project: ${env.JOB_NAME} <br>Build Number: ${env.BUILD_NUMBER} <br> URL build: ${env.BUILD_URL} <br> ${err}", cc: '', charset: 'UTF-8', from: 'jenkins@mindtree.com', mimeType: 'text/html', replyTo: '', subject: "Pipeline ERROR CI: Project name -> ${env.JOB_NAME}", to: "yathishkumar1269@gmail.com"
+}
+}
+

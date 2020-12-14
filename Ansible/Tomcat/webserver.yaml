@@ -1,0 +1,51 @@
+---
+
+- hosts: docker-container
+  name: My Web Server Deployment
+  vars: 
+    doc_root: "/var/www/html"
+    doc_tomcat: "/opt/SP/apps"
+    doc_tomcat_webapps: "/opt/SP/apps/tomcat/webapps/webapp"
+  
+  tasks: 
+  - name: Install Apache2 Packages
+    apt: name=apache2 state=present
+
+  - name: Deploy Custom Web Page
+    copy: src=files/index.html dest={{doc_root}}/index.html
+
+  - name: Deploy Custom Web Page
+    template: src=templates/info.j2 dest={{doc_root}}/info.html
+  
+  - name: Start the Apache Service 
+    command: "apache2ctl  start"
+
+  - name: Tomcat Home Dir.
+    file: path={{doc_tomcat}}/tomcat state=directory
+
+  
+  - name: Install Default JDK 1.8
+    apt: name=default-jdk state=present
+  
+  - name: Download Tomcat TarBall 
+    get_url: url="http://apachemirror.wuchna.com/tomcat/tomcat-8/v8.5.61/bin/apache-tomcat-8.5.61.tar.gz"  dest={{doc_tomcat}}/tomcat.tag.gz mode=0755
+
+  - name: Extract Tomcat Tarball
+    command: "tar zxf {{doc_tomcat}}/tomcat.tag.gz -C  {{doc_tomcat}}/tomcat --strip-components 1"
+
+
+  - name: Tomcat WebApp Dir.
+    file: path={{doc_tomcat_webapps}} state=directory
+
+  - name: Deploy Jenkins Index Page
+    copy: src=files/jenkins.html dest={{doc_tomcat_webapps}}/index.html
+
+  - name: Deploy Petclinic War File
+    copy: src=files/petclinic.war dest={{doc_tomcat}}/tomcat/webapps
+    notify: 
+    - Restart Tomcat 
+
+  handlers: 
+  - name: Restart Tomcat
+    shell: "nohup sh /opt/SP/apps/tomcat/bin/catalina.sh start"
+  
